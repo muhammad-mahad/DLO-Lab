@@ -53,6 +53,14 @@ class Train_Env_Wiring_post(Train_Env):
             material=gs.materials.ROD.Base(
                 segment_radius=segment_radius,
                 segment_mass=0.001,
+                # N1 F-1: K and use_inextensible were unset, so ROD.Base defaults
+                # K=0.0 / use_inextensible=True applied and compute_stretching_energy's
+                # `if K > 0.` gate (rod_solver.py:722) never fired -- stretching energy
+                # was never computed and get_all_stretching_force() returned zeros.
+                # K=1e5 matches 4 of the 5 envs that set it, incl. env_wrapping:49
+                # (the nearest analogue: posts + rope, E=1e4). See n1/docs/F0_PROVENANCE.md
+                K=1e5,
+                use_inextensible=False,
                 E=1e4,
                 G=1e3,
             ),
