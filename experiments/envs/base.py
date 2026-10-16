@@ -40,8 +40,12 @@ class Train_Env():
             # Initialize scene, if not provided
             if not gs._initialized:
                 # gs.init() reseeds random/numpy/torch/cuda, so it must use the caller's seed
+                # N1 (seed patch, ported to 4af0562): DLOLAB_GS_SEED=<int> overrides the seed (declared, env-gated);
+                # unset = upstream 4af0562 (the caller's config seed). The stamp goes to the run's stdout.
+                _gs_seed = int(os.environ["DLOLAB_GS_SEED"]) if os.environ.get("DLOLAB_GS_SEED") else config.get('seed', 0)
+                print("[gs-seed] DLOLAB_GS_SEED=%s -> gs.init(seed=%d)" % (os.environ.get("DLOLAB_GS_SEED", "(unset: config seed)"), _gs_seed), flush=True)
                 gs.init(
-                    seed=config.get('seed', 0), precision="64", logging_level="error", backend=gs.gpu,
+                    seed=_gs_seed, precision="64", logging_level="error", backend=gs.gpu,
                     performance_mode=True
                 )
 
@@ -112,6 +116,10 @@ class Train_Env():
         self.randomization_initialized = False
 
     def save_animation(self, save_dir):
+        if os.environ.get("DLOLAB_TEST_DUMP_VERTS") and getattr(self, "_n1_vert_log", None):   # N1 audit 2026-09-17 (C)
+            _tag = os.environ.get("DLOLAB_GS_SEED", "0")
+            np.save(os.path.join(save_dir, f"test_final_verts_gs{_tag}.npy"), np.asarray(self._n1_vert_log[-1], dtype=np.float32))
+            np.save(os.path.join(save_dir, f"test_verts_log_gs{_tag}.npy"), np.asarray(self._n1_vert_log, dtype=np.float32))
         if len(self.frames) == 0:
             return
 

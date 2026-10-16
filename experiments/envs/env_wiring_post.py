@@ -13,6 +13,20 @@ from utils.controller import (
 asset_dir = os.path.join(os.path.dirname(__file__), "..", "..", "genesis", "assets", "dlo-lab")
 
 
+def _n1_log_verts(env):
+    """N1 audit 2026-09-17 (C): with DLOLAB_TEST_DUMP_VERTS set, keep the rope vertices of all envs at every captured frame."""
+    if os.environ.get("DLOLAB_TEST_DUMP_VERTS"):
+        v = env.rope.get_all_verts()
+        env._n1_vert_log = getattr(env, "_n1_vert_log", [])
+        env._n1_vert_log.append(np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v, dtype=np.float32))
+
+def _n1_plant_kwargs():
+    """N1 plant switch (audit 2026-09-17): 'paper' (default) = upstream rope kwargs; 'k1e5' = the N1 F-1 extensible rope."""
+    plant = os.environ.get("DLOLAB_WIRING_PLANT", "paper")
+    kw = {} if plant == "paper" else dict(K=1e5, use_inextensible=False)
+    print("[plant] DLOLAB_WIRING_PLANT=%s -> rope kwargs %s" % (plant, kw or "upstream defaults (K=0, use_inextensible=True)"), flush=True)
+    return kw
+
 class Train_Env_Wiring_post(Train_Env):
     def __init__(self, config):
         super().__init__(config=config)
@@ -59,8 +73,10 @@ class Train_Env_Wiring_post(Train_Env):
                 # was never computed and get_all_stretching_force() returned zeros.
                 # K=1e5 matches 4 of the 5 envs that set it, incl. env_wrapping:49
                 # (the nearest analogue: posts + rope, E=1e4). See n1/docs/F0_PROVENANCE.md
-                K=1e5,
-                use_inextensible=False,
+                # N1 4.437 plant switch, v2 (audit 2026-09-17 T7/m13): 'paper' (DEFAULT) = upstream defaults
+                # (K=0 -> no stretching energy, inextensible projection; Table 3: Wiring-post stretching '-',
+                # inextensibility check); 'k1e5' = the N1 F-1 extensible rope. Prints the plant to stdout.
+                **_n1_plant_kwargs(),
                 E=1e4,
                 G=1e3,
             ),
@@ -179,7 +195,10 @@ class Train_Env_Wiring_post(Train_Env):
         self.scene.build(n_envs=self.n_envs, env_spacing=(10, 10), center_envs_at_origin=False)
 
         # candidate mode grasp proposal
-        self.control_idx = [3]
+        # B2 grasp switch (PREREG_B2_GRASP_2026-10-16, auditor pass 164): DLOLAB_GRASP_IDX=<int> sets the grasped vertex; unset = 3 =
+        # DLO-Lab as published (candidate mode). Declared env-gated deviation; printed to stdout.
+        self.control_idx = [int(os.environ.get("DLOLAB_GRASP_IDX", "3"))]
+        print("[grasp] DLOLAB_GRASP_IDX=%s -> control_idx %s" % (os.environ.get("DLOLAB_GRASP_IDX", "(unset)"), self.control_idx), flush=True)
 
         # Construct controller
         for f in [self.franka1]:
@@ -407,6 +426,7 @@ class Train_Env_Wiring_post(Train_Env):
                         for cid, cam in enumerate(self.cameras):
                             img = cam.render()[0]
                             self.frames[cid].append(img)
+                        _n1_log_verts(self)   # N1 audit 2026-09-17 (C): rope vertices of all envs
                 forward_elapsed += time.time() - forward_start_time
 
                 global_step = i * n_steps_sub + (j + 1)
@@ -551,6 +571,7 @@ class Train_Env_Wiring_post(Train_Env):
                     for cid, cam in enumerate(self.cameras):
                         img = cam.render()[0]
                         self.frames[cid].append(img)
+                    _n1_log_verts(self)   # N1 audit 2026-09-17 (C): rope vertices of all envs
 
             # Post-step: detect NaNs that emerge during micro-stepping
             verts_rope_post = self.rope.get_all_verts()
@@ -628,6 +649,7 @@ class Train_Env_Wiring_post(Train_Env):
                     for cid, cam in enumerate(self.cameras):
                         img = cam.render()[0]
                         self.frames[cid].append(img)
+                    _n1_log_verts(self)   # N1 audit 2026-09-17 (C): rope vertices of all envs
 
             # Post-step: detect NaNs that emerge during micro-stepping
             verts_rope_post = self.rope.get_all_verts()
@@ -693,6 +715,7 @@ class Train_Env_Wiring_post(Train_Env):
                     for cid, cam in enumerate(self.cameras):
                         img = cam.render()[0]
                         self.frames[cid].append(img)
+                    _n1_log_verts(self)   # N1 audit 2026-09-17 (C): rope vertices of all envs
             forward_elapsed += time.time() - forward_start_time
 
             # Post-step: detect NaNs that emerge during micro-stepping

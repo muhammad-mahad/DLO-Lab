@@ -165,12 +165,28 @@ def experiment(args):
     ########################## train ##########################
 
     for it in range(iter_start, args.n_epochs):
+        _es_prev_traj = gd_env.c.traj.detach().clone() if hasattr(gd_env, 'c') else None   # N1 B.5 patch: the iterate this epoch evaluates
         out = gd_env.train_one_iter_gd(it=it, max_it=args.n_epochs)
         iter_rewards = out["reward"]
         max_iter_reward_idx = np.argmax(iter_rewards)
         iter_reward = iter_rewards[max_iter_reward_idx].item()
 
         print(f'Epoch {it}: loss={out["loss"]:.4f}, reward_accum={iter_reward:.4f}, forw={out["forward_time"]:.2f}s, back={out["backward_time"]:.2f}s, lr={out["lr"]:.3e}')
+        # N1 audit 2026-09-17 (M1): App. B.5 early stopping, declared deviation, env-var gated (unset = upstream).
+        _es_n = int(os.environ.get('DLOLAB_GD_EARLY_STOP', '0'))
+        if _es_n > 0:
+            _es_loss = float(out['loss'])
+            if it == iter_start or _es_loss < _es_best_loss:
+                _es_best_loss, _es_best_it = _es_loss, it
+            elif it - _es_best_it >= _es_n:
+                print(f'[early-stop] App. B.5: no new loss minimum for {_es_n} epochs (min {_es_best_loss:.4f} at epoch {_es_best_it}); stopping at epoch {it}, reward_accum={iter_reward:.4f}', flush=True)
+                if _es_prev_traj is not None:
+                    torch.save(_es_prev_traj.cpu(), (log_dir / 'earlystop_traj_evaluated.pt').as_posix())
+                torch.save(gd_env.c.traj.cpu(), (log_dir / 'earlystop_traj.pt').as_posix())
+                np.save((log_dir / 'earlystop_qpos.npy').as_posix(), out['qpos_seq'][:, max_iter_reward_idx])
+                with open((log_dir / 'earlystop.json').as_posix(), 'w') as _f:
+                    json.dump({'stop_epoch': it, 'best_loss_epoch': _es_best_it, 'best_loss': _es_best_loss, 'loss_at_stop': _es_loss, 'reward_at_stop': iter_reward, 'patience': _es_n}, _f, indent=2)
+                break
 
         if iter_reward > max_reward:
             max_reward = iter_reward

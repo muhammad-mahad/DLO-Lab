@@ -335,6 +335,12 @@ def optimize_trajectory(
 
         qpos_array = np.asarray(qpos_list, dtype=np.float32)
         assert qpos_array.shape[0] == len(X), f"qpos_array {qpos_array.shape[0]} and X lengths {len(X)} do not match"
+        if os.environ.get("DLOLAB_CMAES_SAVE_POP"):   # N1 audit 2026-09-17 (4.539 E): keep every candidate + its qpos
+            os.makedirs(os.path.join(log_dir, "ckpts"), exist_ok=True)   # 09-18 fix: ckpts/ did not exist at iter 0 (crash loop, 4.556 note)
+            np.savez_compressed(os.path.join(log_dir, "ckpts", f"pop_iter{it:03d}.npz"),
+                                X=np.asarray(X, dtype=np.float32), qpos=qpos_array,
+                                cum=np.asarray(all_rewards, dtype=np.float32),
+                                final=np.asarray(all_final_rewards, dtype=np.float32))
         gen_best_qpos = np.asarray(qpos_array[gen_best_idx], dtype=np.float32)
 
         gen_best_x = np.asarray(X[gen_best_idx], dtype=np.float32)
