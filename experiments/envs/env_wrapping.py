@@ -14,10 +14,12 @@ class Train_Env_Wrapping(Train_Env):
     def __init__(self, config):
         super().__init__(config=config)
 
-        # initial total length
-        self.control_dist_init = self.rope.get_total_length()   # (n_envs,)
+        # initial geodesic distance between the control points (the quantity the
+        # stretching-failure checks below divide by; it was the total rope length,
+        # so the "20% stretch allowed" test could not fire)
+        self.control_dist_init = self.rope.get_geodesic_distance(self.control_idx[0], self.control_idx[1])   # (n_envs,)
 
-        print(f'Initial total length: {self.control_dist_init[0]:.4f}')
+        print(f'Initial distance between control points: {self.control_dist_init[0]:.4f}')
 
     def construct_scene(self, camera):
         plane = self.scene.add_entity(
