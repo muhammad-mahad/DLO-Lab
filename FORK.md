@@ -9,5 +9,6 @@
 | `fix/wrapping-stretch-denominator-4af` | 4af0562 | 150dc93 | `wrapping`: the stretching-failure check divides by the control-point geodesic, not the total rope length | fix proposed for upstream; never a run tree |
 | `archive/4090-dlo_lab-1d0fd59` | c5026a9 | 1d0fd59 | same tree as dd1aa6e (identical files, different commit); the 4090 copy that Genesis is imported from | archive only, so the hash can be found |
 | `contrib/install-verify-analysis` | c5026a9 | e3fb72d, ea76db8 | install guide, task verification script, unknotting failure analysis | upstream PR #1 (closed); history |
+| `n1/consolidated-on-4af0562` | 4af0562 | fd5d5da, **2eb5342** (so far; ports follow: 150dc93, the W6 SDF fix, the contrib files; each env-gated, default OFF) | the ONE branch we are consolidating onto, started at 2eb5342 itself (19 Nov 2026) | work in progress; 2eb5342 stays the code of record for every run of record |
 
 Removed 18 Nov 2026: `fix/gathering-genesis-init` (upstream PR #3, closed; no commits left) and `fix/wrapping-stretch-denominator` (duplicate of 150dc93 on the old base, dc66b41).
