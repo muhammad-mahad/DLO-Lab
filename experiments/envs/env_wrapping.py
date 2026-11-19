@@ -17,7 +17,16 @@ class Train_Env_Wrapping(Train_Env):
         # initial total length
         self.control_dist_init = self.rope.get_total_length()   # (n_envs,)
 
-        print(f'Initial total length: {self.control_dist_init[0]:.4f}')
+        # N1 consolidated branch (19 Nov 2026), env-gated, default OFF: port of fork commit 150dc93.
+        # DLOLAB_STRETCH_DENOM=geodesic makes the stretching-failure checks below divide by the initial geodesic
+        # distance between the two control points (what they compare it with), instead of the total rope length.
+        # Unset (or any other value) = upstream 4af0562 behaviour, byte for byte.
+        import os as _n1_os
+        if _n1_os.environ.get("DLOLAB_STRETCH_DENOM") == "geodesic":
+            self.control_dist_init = self.rope.get_geodesic_distance(self.control_idx[0], self.control_idx[1])   # (n_envs,)
+            print(f'Initial distance between control points: {self.control_dist_init[0]:.4f}')
+        else:
+            print(f'Initial total length: {self.control_dist_init[0]:.4f}')
 
     def construct_scene(self, camera):
         plane = self.scene.add_entity(
