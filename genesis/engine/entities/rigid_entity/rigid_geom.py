@@ -140,6 +140,19 @@ class RigidGeom(RBC):
         per_axis_upper = grid_size / max(self._material.sdf_min_res - 1, 2)
         self._sdf_cell_size = gs.EPS + np.clip(self._material.sdf_cell_size, per_axis_lower, per_axis_upper)
         self._sdf_res = np.ceil(grid_size / self._sdf_cell_size).astype(gs.np_int) + 1
+        # N1 fork patch v2 (T7, 19 Nov 2026), env-gated, default OFF. DLOLAB_SDF_PAD_M > 0 widens this geom's SDF grid
+        # by about that many metres per side WITHOUT changing the cell: the cell and the centre stay exactly as upstream
+        # and only the resolution grows by an even number of cells, so every upstream grid point is also a grid point here
+        # and the SDF inside the upstream extent is unchanged ("extent only"). The resolution is capped at sdf_max_res;
+        # when the cap binds, the pad is reduced (warned). Unset or 0: upstream behaviour exactly.
+        _n1_sdf_pad = float(os.environ.get("DLOLAB_SDF_PAD_M", "0"))
+        if _n1_sdf_pad > 0.0:
+            _n1_add = np.ceil(_n1_sdf_pad / self._sdf_cell_size).astype(gs.np_int)
+            _n1_cap = np.full_like(self._sdf_res, self._material.sdf_max_res)
+            _n1_add = np.minimum(_n1_add, (_n1_cap - self._sdf_res) // 2)
+            if (_n1_add * self._sdf_cell_size < _n1_sdf_pad - 1e-12).any():
+                gs.logger.warning(f"N1 SDF pad capped at sdf_max_res for geom idx {self._idx}: per-side pad {(_n1_add * self._sdf_cell_size).tolist()} m")
+            self._sdf_res = (self._sdf_res + 2 * np.maximum(_n1_add, 0)).astype(gs.np_int)
         self._sdf_grad_delta = (
             np.zeros(3, dtype=gs.np_float) if self.type == gs.GEOM_TYPE.TERRAIN else self._sdf_cell_size * 1e-2
         )
@@ -157,6 +170,10 @@ class RigidGeom(RBC):
             self._material.sdf_min_res,
             self._material.sdf_max_res,
         )
+        _n1_sdf_pad = float(os.environ.get("DLOLAB_SDF_PAD_M", "0"))
+        if _n1_sdf_pad > 0.0:  # N1 fork v2: a widened grid must not reuse an upstream or v1 cache (the cache key has no padding)
+            _root, _ext = os.path.splitext(self._gsd_path)
+            self._gsd_path = f"{_root}_n1v2pad{_n1_sdf_pad:.4f}{_ext}"
 
         # loading pre-computed cache if available
         is_cached_loaded = False
